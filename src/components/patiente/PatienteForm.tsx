@@ -4,6 +4,7 @@ import type { IPatient } from "../../types/patient/paciente";
 import { useAppDispatch } from "../../hooks/patientHook";
 import { addPatient } from "../../store/patientSlice";
 import { v4 as uuidv4 } from "uuid";
+import { maskCpf, isValidCPF } from "../../utils/cpf";
 
 const requiredFields = [
 	"fullName",
@@ -12,8 +13,10 @@ const requiredFields = [
 	"cpf",
 	"address",
 	"phone",
+	"emergencyContactName",
+	"emergencyContactPhone",
+	"allergies",
 ];
-
 const emptyPatient = (): Partial<IPatient> => ({
 	fullName: "",
 	socialName: "",
@@ -22,8 +25,8 @@ const emptyPatient = (): Partial<IPatient> => ({
 	gender: "",
 	cpf: "",
 	rg: "",
-	naturality: "",
 	nationality: "",
+	naturality: "",
 	profession: "",
 	address: "",
 	phone: "",
@@ -47,36 +50,56 @@ export default function PatienteForm() {
 	const dispatch = useAppDispatch();
 	const [form, setForm] = useState<Partial<IPatient>>(emptyPatient());
 	const [errors, setErrors] = useState<{ [key: string]: string }>({});
+	const [cpfError, setCpfError] = useState("");
 
 	function setField<K extends keyof IPatient>(field: K, value: IPatient[K]) {
 		setForm((prev) => ({ ...prev, [field]: value }));
-		// if (errors[field]) {
-		//     setErrors((prev) => {
-		//         const newErrors = { ...prev };
-		//         delete newErrors[field];
-		//         return newErrors;
-		//     });
-		// }
+	}
+
+	function handleCpfChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const raw = e.target.value;
+		const masked = maskCpf(raw);
+		setField("cpf", masked);
+
+		const digits = masked.replace(/\D/g, "");
+		if (digits.length === 11) {
+			if (!isValidCPF(digits)) {
+				setCpfError("CPF inválido");
+			} else {
+				setCpfError("");
+			}
+		} else {
+			// incompleto -> sem erro explícito (mas botão ficará desabilitado)
+			setCpfError("");
+		}
 	}
 
 	function validate() {
 		const newErrors: Record<string, string> = {};
-		// required
+
+		// required fields
 		requiredFields.forEach((f) => {
 			// @ts-ignore
 			if (!form[f]) newErrors[f] = "Campo obrigatório";
 		});
-		// basic CPF format check (digits only, 11 chars) - lightweight
-		if (form.cpf && !/^[0-9]{11}$/.test(form.cpf.replace(/\D/g, ""))) {
-			newErrors.cpf = "CPF deve conter 11 dígitos";
+
+		// CPF completo e válido
+		if (form.cpf) {
+			const digits = form.cpf.replace(/\D/g, "");
+			if (digits.length !== 11 || !isValidCPF(digits)) {
+				newErrors.cpf = "CPF inválido";
+			}
 		}
-		// email
+
+		// email simples
 		if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) {
 			newErrors.email = "E-mail inválido";
 		}
+
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
 	}
+
 	function onSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		if (!validate()) return;
@@ -115,7 +138,19 @@ export default function PatienteForm() {
 		dispatch(addPatient(patient));
 		alert("Paciente cadastrado com sucesso!");
 		setForm(emptyPatient());
+		setErrors({});
+		setCpfError("");
 	}
+
+	const cpfDigits = (form.cpf || "").replace(/\D/g, "");
+	const isFormInvalid =
+		Object.keys(errors).length > 0 ||
+		!form.fullName ||
+		!form.birthDate ||
+		!form.gender ||
+		!form.cpf ||
+		cpfDigits.length !== 11 ||
+		!!cpfError;
 	return (
 		<form className={styles.form} onSubmit={onSubmit} noValidate>
 			<h2>Cadastro de Paciente</h2>
@@ -197,10 +232,13 @@ export default function PatienteForm() {
 						<input
 							className={styles.input}
 							value={form.cpf || ""}
-							onChange={(e) => setField("cpf", e.target.value)}
-							placeholder="Somente números"
+							onChange={handleCpfChange}
+							placeholder="000.000.000-00"
+							maxLength={14}
 						/>
-						{errors.cpf && <div className={styles.error}>{errors.cpf}</div>}
+						{(errors.cpf || cpfError) && (
+							<div className={styles.error}>{errors.cpf || cpfError}</div>
+						)}
 					</div>
 				</div>
 			</section>

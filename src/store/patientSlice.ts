@@ -1,19 +1,12 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { IPatient } from "../types/patient/paciente";
-
-interface PatientState {
+interface PatientsState {
 	patients: IPatient[];
-	selectedPatient: IPatient | null;
-	loading: boolean;
-	error: string | null;
 }
 
-const initialState: PatientState = {
+const initialState: PatientsState = {
 	patients: [],
-	selectedPatient: null,
-	loading: false,
-	error: null,
 };
 
 const patientSlice = createSlice({
@@ -24,15 +17,11 @@ const patientSlice = createSlice({
 			state.patients.push(action.payload);
 		},
 		updatePatient(state, action: PayloadAction<IPatient>) {
-			const idx = state.patients.findIndex(
-				(p: IPatient) => p.id === action.payload.id
-			);
+			const idx = state.patients.findIndex((p) => p.id === action.payload.id);
 			if (idx >= 0) state.patients[idx] = action.payload;
 		},
 		removePatient(state, action: PayloadAction<string>) {
-			state.patients = state.patients.filter(
-				(p: IPatient) => p.id !== action.payload
-			);
+			state.patients = state.patients.filter((p) => p.id !== action.payload);
 		},
 	},
 });
