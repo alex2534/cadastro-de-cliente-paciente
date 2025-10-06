@@ -1,10 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./patienteForm.module.css";
 import type { IPatient } from "../../types/patient/paciente";
-import { useAppDispatch } from "../../hooks/patientHook";
-import { addPatient } from "../../store/patientSlice";
+import { useAppDispatch, useAppSelector } from "../../hooks/patientHook";
 import { v4 as uuidv4 } from "uuid";
 import { maskCpf, isValidCPF } from "../../utils/cpf";
+import {
+	PatientServiceFirebase,
+	patientServiceFirebase,
+} from "../../services/patientServiceFirebase";
+
+import {
+	addPatientAsync,
+	fetchPatientByCpf,
+	updatePatientByCpf,
+	deletePatientByCpf,
+} from "../../store/patientSlice";
+import { patientService } from "../../services/patientService";
 
 const requiredFields = [
 	"fullName",
@@ -48,30 +59,62 @@ const emptyPatient = (): Partial<IPatient> => ({
 
 export default function PatienteForm() {
 	const dispatch = useAppDispatch();
+	const { selectedPatient, loading } = useAppSelector(
+		(state) => state.patients
+	);
+
+	console.log("Selected Patient from Redux:", selectedPatient);
 	const [form, setForm] = useState<Partial<IPatient>>(emptyPatient());
 	const [errors, setErrors] = useState<{ [key: string]: string }>({});
 	const [cpfError, setCpfError] = useState("");
+	const [searchCpf, setSearchCpf] = useState("");
+	const [message, setMessage] = useState("");
+	const [isError, setIsError] = useState(false);
+	const [searchError, setSearchError] = useState("");
 
 	function setField<K extends keyof IPatient>(field: K, value: IPatient[K]) {
 		setForm((prev) => ({ ...prev, [field]: value }));
 	}
 
-	function handleCpfChange(e: React.ChangeEvent<HTMLInputElement>) {
-		const raw = e.target.value;
-		const masked = maskCpf(raw);
-		setField("cpf", masked);
+	const handleSearch = async () => {
+		try {
+			const patient = await PatientServiceFirebase.getByCpf(searchCpf);
 
-		const digits = masked.replace(/\D/g, "");
-		if (digits.length === 11) {
-			if (!isValidCPF(digits)) {
-				setCpfError("CPF inválido");
-			} else {
-				setCpfError("");
+			if (!patient) {
+				setSearchCpf("Cpf not found");
+				return;
 			}
-		} else {
-			// incompleto -> sem erro explícito (mas botão ficará desabilitado)
-			setCpfError("");
+
+			setForm(patient);
+			console.log("Patient fetched:", patient);
+			setSearchError("");
+		} catch (error) {
+		} finally {
+			console.log("Request to fetch patient completed.");
 		}
+
+		if (!isValidCPF(searchCpf)) {
+			setMessage("CPF inválido para pesquisa.");
+			return;
+		}
+		dispatch(fetchPatientByCpf(searchCpf.replace(/\D/g, "")));
+	};
+
+	async function handleUpdate() {
+		if (!form.cpf) return;
+		console.log("Form to update:", form);
+		await dispatch(
+			updatePatientByCpf({ cpf: form.cpf, data: form as IPatient })
+		);
+		setMessage("Paciente atualizado com sucesso!");
+	}
+
+	async function handleDelete() {
+		if (!form.cpf) return;
+		if (!window.confirm("Confirma a exclusão deste paciente?")) return;
+		await dispatch(deletePatientByCpf(form.cpf));
+		setForm(emptyPatient());
+		setMessage("Paciente excluído com sucesso!");
 	}
 
 	function validate() {
@@ -100,60 +143,98 @@ export default function PatienteForm() {
 		return Object.keys(newErrors).length === 0;
 	}
 
-	function onSubmit(e: React.FormEvent) {
+	function handleCpfChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const raw = e.target.value;
+		const masked = maskCpf(raw);
+		setField("cpf", masked);
+
+		const digits = masked.replace(/\D/g, "");
+		if (digits.length === 11) {
+			if (!isValidCPF(digits)) {
+				setCpfError("CPF inválido");
+			} else {
+				setCpfError("");
+			}
+		} else {
+			// incompleto -> sem erro explícito (mas botão ficará desabilitado)
+			setCpfError("");
+		}
+	}
+
+	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		if (!validate()) return;
 
 		const patient: IPatient = {
 			id: uuidv4(),
-			fullName: (form.fullName || "").trim(),
-			socialName: form.socialName,
-			motherName: form.motherName,
-			birthDate: form.birthDate || "",
-			gender: form.gender || "",
+			...form,
 			cpf: (form.cpf || "").replace(/\D/g, ""),
-			rg: form.rg,
-			nationality: form.nationality,
-			naturality: form.naturality,
-			profession: form.profession,
-			address: form.address,
-			phone: form.phone,
-			phoneSecondary: form.phoneSecondary,
-			email: form.email,
-			emergencyContactName: form.emergencyContactName,
-			emergencyContactPhone: form.emergencyContactPhone,
-			healthInsurance: form.healthInsurance,
-			insuranceNumber: form.insuranceNumber,
-			insuranceValidity: form.insuranceValidity,
-			allergies: form.allergies,
-			chronicDiseases: form.chronicDiseases,
-			medications: form.medications,
-			surgeries: form.surgeries,
-			familyHistory: form.familyHistory,
-			habits: form.habits,
-			mainComplaint: form.mainComplaint,
-			photoUrl: form.photoUrl,
 			createdAt: new Date().toISOString(),
-		};
-		dispatch(addPatient(patient));
-		alert("Paciente cadastrado com sucesso!");
+		} as IPatient;
+
+		await dispatch(addPatientAsync(patient));
+
 		setForm(emptyPatient());
 		setErrors({});
 		setCpfError("");
+		setMessage("Paciente cadastrado com sucesso!");
 	}
 
 	const cpfDigits = (form.cpf || "").replace(/\D/g, "");
+
 	const isFormInvalid =
 		Object.keys(errors).length > 0 ||
 		!form.fullName ||
+		!form.motherName ||
 		!form.birthDate ||
 		!form.gender ||
 		!form.cpf ||
 		cpfDigits.length !== 11 ||
 		!!cpfError;
+	!form.address ||
+		!form.phone ||
+		!form.emergencyContactName ||
+		!form.emergencyContactPhone ||
+		!form.allergies;
+
 	return (
-		<form className={styles.form} onSubmit={onSubmit} noValidate>
-			<h2>Cadastro de Paciente</h2>
+		<form className={styles.form} onSubmit={handleSubmit} noValidate>
+			<h2>Cadastro e Gerenciamento de Pacientes</h2>
+			{/* 🔍 Busca por CPF */}
+			{message && (
+				<div
+					className={
+						isError
+							? styles.errorMessage // red background for errors
+							: styles.successMessage // green background for success
+					}
+				>
+					{message}
+				</div>
+			)}
+			<div className={styles.row}>
+				<div className={styles.field}>
+					<label className={styles.label}>Buscar por CPF</label>
+					<input
+						className={styles.input}
+						value={maskCpf(searchCpf)}
+						onChange={(e) => setSearchCpf(maskCpf(e.target.value))}
+						placeholder="000.000.000-00"
+					/>
+				</div>
+				<button
+					type="button"
+					className={`${styles.btn} ${styles.btnSearch}`}
+					onClick={handleSearch}
+					disabled={loading}
+				>
+					Buscar
+				</button>
+			</div>
+
+			{/* {isError === true && (
+				<p style={{ color: isError ? "red" : "green" }}>{message}</p>
+			)} */}
 			<section>
 				<div className={styles.row}>
 					<div className={styles.field}>
@@ -161,8 +242,10 @@ export default function PatienteForm() {
 							Nome completo <span className={styles.required}>*</span>
 						</label>
 						<input
+							type="text"
+							placeholder="Nome completo"
 							className={styles.input}
-							value={form.fullName || ""}
+							value={form.fullName}
 							onChange={(e) => setField("fullName", e.target.value)}
 						/>
 						{errors.fullName && (
@@ -173,8 +256,10 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Nome social</label>
 						<input
+							type="text"
+							placeholder="Nome social"
 							className={styles.input}
-							value={form.socialName || ""}
+							value={form.socialName}
 							onChange={(e) => setField("socialName", e.target.value)}
 						/>
 					</div>
@@ -182,8 +267,10 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Nome da mãe</label>
 						<input
+							type="text"
+							placeholder="Nome da mãe"
 							className={styles.input}
-							value={form.motherName || ""}
+							value={form.motherName}
 							onChange={(e) => setField("motherName", e.target.value)}
 						/>
 					</div>
@@ -196,8 +283,9 @@ export default function PatienteForm() {
 						</label>
 						<input
 							type="date"
+							placeholder="Data de nascimento"
 							className={styles.input}
-							value={form.birthDate || ""}
+							value={form.birthDate}
 							onChange={(e) => setField("birthDate", e.target.value)}
 						/>
 						{errors.birthDate && (
@@ -211,7 +299,7 @@ export default function PatienteForm() {
 						</label>
 						<select
 							className={styles.select}
-							value={form.gender || ""}
+							value={form.gender}
 							onChange={(e) => setField("gender", e.target.value)}
 						>
 							<option value="">-- selecione --</option>
@@ -231,7 +319,9 @@ export default function PatienteForm() {
 						</label>
 						<input
 							className={styles.input}
-							value={form.cpf || ""}
+							type="text"
+							id="cpf"
+							value={form.cpf}
 							onChange={handleCpfChange}
 							placeholder="000.000.000-00"
 							maxLength={14}
@@ -251,6 +341,8 @@ export default function PatienteForm() {
 						</label>
 						<input
 							className={styles.input}
+							type="text"
+							id="address"
 							value={form.address || ""}
 							onChange={(e) => setField("address", e.target.value)}
 						/>
@@ -264,6 +356,8 @@ export default function PatienteForm() {
 							Telefone celular <span className={styles.required}>*</span>
 						</label>
 						<input
+							type="text"
+							id="phone"
 							className={styles.input}
 							value={form.phone || ""}
 							onChange={(e) => setField("phone", e.target.value)}
@@ -274,6 +368,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Telefone fixo</label>
 						<input
+							type="text"
 							className={styles.input}
 							value={form.phoneSecondary || ""}
 							onChange={(e) => setField("phoneSecondary", e.target.value)}
@@ -299,6 +394,7 @@ export default function PatienteForm() {
 							<span className={styles.required}>*</span>
 						</label>
 						<input
+							type="text"
 							className={styles.input}
 							value={form.emergencyContactName || ""}
 							onChange={(e) => setField("emergencyContactName", e.target.value)}
@@ -314,6 +410,7 @@ export default function PatienteForm() {
 							<span className={styles.required}>*</span>
 						</label>
 						<input
+							type="text"
 							className={styles.input}
 							value={form.emergencyContactPhone || ""}
 							onChange={(e) =>
@@ -333,6 +430,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Convênio / Plano de saúde</label>
 						<input
+							type="text"
 							className={styles.input}
 							value={form.healthInsurance || ""}
 							onChange={(e) => setField("healthInsurance", e.target.value)}
@@ -342,6 +440,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Número da carteirinha</label>
 						<input
+							type="text"
 							className={styles.input}
 							value={form.insuranceNumber || ""}
 							onChange={(e) => setField("insuranceNumber", e.target.value)}
@@ -367,6 +466,7 @@ export default function PatienteForm() {
 							Alergias <span className={styles.required}>*</span>
 						</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.allergies || ""}
 							onChange={(e) => setField("allergies", e.target.value)}
@@ -379,6 +479,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Doenças crônicas</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.chronicDiseases || ""}
 							onChange={(e) => setField("chronicDiseases", e.target.value)}
@@ -388,6 +489,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Medicamentos em uso</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.medications || ""}
 							onChange={(e) => setField("medications", e.target.value)}
@@ -399,6 +501,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Cirurgias anteriores</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.surgeries || ""}
 							onChange={(e) => setField("surgeries", e.target.value)}
@@ -408,6 +511,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Histórico familiar</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.familyHistory || ""}
 							onChange={(e) => setField("familyHistory", e.target.value)}
@@ -417,6 +521,7 @@ export default function PatienteForm() {
 					<div className={styles.field}>
 						<label className={styles.label}>Hábitos de saúde</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.habits || ""}
 							onChange={(e) => setField("habits", e.target.value)}
@@ -428,6 +533,7 @@ export default function PatienteForm() {
 					<div className={styles.field} style={{ flex: "1 1 100%" }}>
 						<label className={styles.label}>Queixa principal</label>
 						<textarea
+							typeof="text"
 							className={styles.textarea}
 							value={form.mainComplaint || ""}
 							onChange={(e) => setField("mainComplaint", e.target.value)}
@@ -436,18 +542,44 @@ export default function PatienteForm() {
 				</div>
 			</section>
 			<section>
-				<div className={styles.actions}>
+				<div className={styles.buttonGroup}>
 					<button
 						type="button"
-						className={`${styles.btn} ${styles.btnCancel}`}
+						className={`${styles.btn} ${styles.btnClear}`}
 						onClick={() => setForm(emptyPatient())}
 					>
 						Cancelar
 					</button>
-					<button type="submit" className={`${styles.btn} ${styles.btnSave}`}>
+					<button
+						type="submit"
+						className={`${styles.btn} ${styles.btnSave}`}
+						disabled={isFormInvalid}
+					>
 						Salvar
 					</button>
+					<button
+						type="button"
+						className={`${styles.btn} ${styles.btnUpdate}`}
+						onClick={handleUpdate}
+					>
+						Atualizar
+					</button>
+					<button
+						type="button"
+						className={`${styles.btn} ${styles.btnDelete}`}
+						onClick={handleDelete}
+					>
+						Excluir
+					</button>
+					{/* <button onClick={() => patientServiceFirebase.seedPatient()}>
+						Add Example Patient
+					</button> */}
 				</div>
+				{isFormInvalid && (
+					<div className={styles.error}>
+						Preencha todos os campos obrigatórios corretamente.
+					</div>
+				)}
 			</section>
 		</form>
 	);

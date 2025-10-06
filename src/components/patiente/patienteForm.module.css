@@ -1,5 +1,7 @@
 .form {
 	max-width: 900px;
+	display: flex;
+	flex-direction: column;
 	margin: 12px auto;
 	padding: 16px;
 	border-radius: 8px;
@@ -8,6 +10,18 @@
 	display: grid;
 	gap: 12px;
 }
+
+section {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	border-bottom: 1px solid #e0e0e0;
+	padding-bottom: 1rem;
+}
+.required {
+	color: red;
+}
+
 .row {
 	display: flex;
 	gap: 12px;
@@ -34,33 +48,99 @@
 	min-height: 80px;
 	resize: vertical;
 }
-.actions {
+
+/* === Botões === */
+.buttonGroup {
 	display: flex;
-	gap: 8px;
-	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	justify-content: center;
+	margin-top: 1rem;
 }
+
 .btn {
-	padding: 8px 14px;
-	border-radius: 6px;
+	flex: 1;
+	min-width: 120px;
+	padding: 0.6rem 1rem;
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: #fff;
 	border: none;
+	border-radius: 0.5rem;
 	cursor: pointer;
-}
-.btnSave {
-	background: #2b7cff;
-	color: white;
+	transition: background-color 0.3s ease, transform 0.2s ease;
 }
 .btnCancel {
 	background: #efefef;
 }
-.required {
-	color: #c0392b;
-	margin-left: 6px;
+
+.btnSave {
+	background-color: #28a745;
 }
-.error {
-	color: #c0392b;
-	font-size: 0.85rem;
+
+.btnSave:hover:not(:disabled) {
+	background-color: #218838;
+	transform: scale(1.03);
 }
-.success {
-	color: #27ae60;
-	font-size: 0.85rem;
+
+.btnSearch {
+	background-color: #007bff;
+	margin-top: 1.6rem;
+}
+
+.btnSearch:hover:not(:disabled) {
+	background-color: #0069d9;
+	transform: scale(1.03);
+}
+
+.btnUpdate {
+	background-color: #ffc107;
+	color: #333;
+}
+
+.btnUpdate:hover:not(:disabled) {
+	background-color: #e0a800;
+	transform: scale(1.03);
+}
+
+.btnDelete {
+	background-color: #dc3545;
+}
+
+.btnDelete:hover:not(:disabled) {
+	background-color: #c82333;
+	transform: scale(1.03);
+}
+
+.btnClear {
+	background-color: #6c757d;
+}
+
+.btnClear:hover:not(:disabled) {
+	background-color: #5a6268;
+	transform: scale(1.03);
+}
+
+/* === Mensagens === */
+
+/* Sucesso → verde */
+.successMessage {
+	background-color: #d4edda;
+	color: #155724;
+	padding: 0.6rem 1rem;
+	border-radius: 0.5rem;
+	border: 1px solid #c3e6cb;
+	text-align: center;
+	font-size: 0.9rem;
+}
+
+/* Erro → vermelho */
+.errorMessage {
+	background-color: #f8d7da;
+	color: #721c24;
+	padding: 0.6rem 1rem;
+	border-radius: 0.5rem;
+	border: 1px solid #f5c6cb;
+	text-align: center;
+	font-size: 0.9rem;
 }
