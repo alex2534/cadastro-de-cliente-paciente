@@ -1,13 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import styles from "./patienteForm.module.css";
 import type { IPatient } from "../../types/patient/paciente";
 import { useAppDispatch, useAppSelector } from "../../hooks/patientHook";
 import { v4 as uuidv4 } from "uuid";
 import { maskCpf, isValidCPF } from "../../utils/cpf";
-import {
-	PatientServiceFirebase,
-	patientServiceFirebase,
-} from "../../services/patientServiceFirebase";
+import { PatientServiceFirebase } from "../../services/patientServiceFirebase";
 
 import {
 	addPatientAsync,
@@ -15,7 +12,6 @@ import {
 	updatePatientByCpf,
 	deletePatientByCpf,
 } from "../../store/patientSlice";
-import { patientService } from "../../services/patientService";
 
 const requiredFields = [
 	"fullName",
@@ -70,7 +66,6 @@ export default function PatienteForm() {
 	const [searchCpf, setSearchCpf] = useState("");
 	const [message, setMessage] = useState("");
 	const [isError, setIsError] = useState(false);
-	const [searchError, setSearchError] = useState("");
 
 	function setField<K extends keyof IPatient>(field: K, value: IPatient[K]) {
 		setForm((prev) => ({ ...prev, [field]: value }));
@@ -87,9 +82,9 @@ export default function PatienteForm() {
 
 			setForm(patient);
 			console.log("Patient fetched:", patient);
-			setSearchError("");
 		} catch (error) {
 		} finally {
+			setIsError(false);
 			console.log("Request to fetch patient completed.");
 		}
 

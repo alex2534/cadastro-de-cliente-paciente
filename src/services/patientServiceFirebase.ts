@@ -3,15 +3,12 @@ import {
 	collection,
 	addDoc,
 	getDocs,
-	getDoc,
 	doc,
 	updateDoc,
 	deleteDoc,
 	query,
 	where,
-	setDoc,
 } from "firebase/firestore";
-import type { IPatient } from "../types/patient/paciente";
 
 export class PatientServiceFirebase {
 	static patientsRef = collection(db, "patients");

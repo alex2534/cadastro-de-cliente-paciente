@@ -92,7 +92,7 @@ const patientSlice = createSlice({
 					state.selectedPatient = null;
 				}
 			})
-			.addCase(updatePatientByCpf.fulfilled, (state, action) => {
+			.addCase(updatePatientByCpf.fulfilled, (state) => {
 				state.selectedPatient = null;
 			})
 			.addCase(deletePatientByCpf.fulfilled, (state, action) => {
